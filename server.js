@@ -5,7 +5,7 @@ const proxy = httpProxy.createProxyServer({});
 
 const server = http.createServer((req, res) => {
     // 1. استخراج الرابط من المسار (إزالة الـ / الأولى)
-    const targetUrl = req.url.slice(1);
+    const targetUrl = req.headers['x-target-url']; // اسحب الرابط من الهيدر وليس المسار
 
     // 2. التحقق من أن الرابط هو رابط فعلي
     if (!targetUrl.startsWith('http')) {
