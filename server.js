@@ -1,34 +1,49 @@
 const http = require('http');
 const httpProxy = require('http-proxy');
 
-const proxy = httpProxy.createProxyServer({});
+// إنشاء بروكسي مع تجاهل أخطاء الـ SSL
+const proxy = httpProxy.createProxyServer({
+    secure: false,
+    changeOrigin: true
+});
 
 const server = http.createServer((req, res) => {
-    // 1. استخراج الرابط من المسار (إزالة الـ / الأولى)
-    const targetUrl = req.headers['x-target-url']; // اسحب الرابط من الهيدر وليس المسار
+    // 1. استخراج الرابط من الهيدر
+    const targetUrl = req.headers['x-target-url'];
 
-    // 2. التحقق من أن الرابط هو رابط فعلي
-    if (!targetUrl.startsWith('http')) {
-        res.writeHead(200);
-        res.end('السيرفر يعمل. يرجى إرسال الطلبات بهذا التنسيق: /https://site.com');
+    // 2. التحقق من وجود الرابط
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<h1>السيرفر يعمل بنجاح! ✅</h1>');
         return;
     }
 
-    console.log(`توجيه إلى: ${targetUrl}`);
+    console.log(`توجيه الطلب إلى: ${targetUrl}`);
 
     // 3. التوجيه الديناميكي
     proxy.web(req, res, {
         target: targetUrl,
-        changeOrigin: true,
-        secure: false,
-        headers: {
-            'Host': 'm.facebook.com' // الهيدر الذي تريده
-        }
+        // changeOrigin: true تضمن تغيير الـ Host ليطابق الوجهة (جوجل)
+        // وبذلك تتجنب تضارب الهيدرات
     }, (err) => {
-        console.error('خطأ:', err);
-        res.writeHead(502);
-        res.end('خطأ في الاتصال بالوجهة');
+        console.error('خطأ في البروكسي:', err.message);
+        if (!res.headersSent) {
+            res.writeHead(502);
+            res.end('فشل الاتصال بالوجهة');
+        }
     });
 });
 
-server.listen(8080);
+// التعامل مع أخطاء البروكسي العامة لمنع توقف السيرفر
+proxy.on('error', (err, req, res) => {
+    console.error('حدث خطأ في البروكسي:', err);
+    if (!res.headersSent) {
+        res.writeHead(502);
+        res.end('خطأ داخلي في البروكسي');
+    }
+});
+
+const port = process.env.PORT || 3000;
+server.listen(port, () => {
+    console.log(`السيرفر يعمل الآن على المنفذ: ${port}`);
+});
