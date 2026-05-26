@@ -4,41 +4,31 @@ const httpProxy = require('http-proxy');
 const proxy = httpProxy.createProxyServer({});
 
 const server = http.createServer((req, res) => {
-    // 1. نقطة فحص (Health Check)
-    // إذا فتح المستخدم الرابط الرئيسي للبروكسي بدون إرسال موقع
-    if (req.url === '/') {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end('<h1>السيرفر يعمل بنجاح! ✅</h1><p>البروكسي جاهز لاستقبال طلباتك.</p>');
-        return;
-    }
+    // 1. استخراج الرابط من المسار (إزالة الـ / الأولى)
+    const targetUrl = req.url.slice(1);
 
-    // 2. استخراج الوجهة الأصلية
-    let targetUrl = req.url.substring(1); 
-    
+    // 2. التحقق من أن الرابط هو رابط فعلي
     if (!targetUrl.startsWith('http')) {
-        res.writeHead(400);
-        res.end('خطأ: الرابط يجب أن يبدأ بـ http أو https');
+        res.writeHead(200);
+        res.end('السيرفر يعمل. يرجى إرسال الطلبات بهذا التنسيق: /https://site.com');
         return;
     }
 
-    console.log(`جارٍ التوجيه إلى: ${targetUrl}`);
+    console.log(`توجيه إلى: ${targetUrl}`);
 
-    // 3. التوجيه
+    // 3. التوجيه الديناميكي
     proxy.web(req, res, {
         target: targetUrl,
         changeOrigin: true,
-        secure: false
-    }, (err) => {
-        console.error('خطأ في البروكسي:', err.message);
-        if (!res.headersSent) {
-            res.writeHead(502);
-            res.end('فشل في الوصول للوجهة');
+        secure: false,
+        headers: {
+            'Host': 'm.facebook.com' // الهيدر الذي تريده
         }
+    }, (err) => {
+        console.error('خطأ:', err);
+        res.writeHead(502);
+        res.end('خطأ في الاتصال بالوجهة');
     });
 });
 
-// إضافة سجل عند التشغيل
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-    console.log(`السيرفر يعمل الآن على المنفذ: ${port}`);
-});
+server.listen(8080);
